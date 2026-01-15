@@ -1,14 +1,24 @@
 import ast
+import inspect
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+import polars as pl
+from pydantic import BaseModel
+
 
 def is_py_file(filename : str) -> bool:
     '''
     is_py_file returns True if the filename is a python file
     '''
     return filename[-3:] == '.py'
+
+
+def calc_func_depth(func_ast: ast.FunctionDef) -> int:
+    return max(calc_depth(expr) for expr in func_ast.body)
+
 
 def calc_depth(expr : ast.AST) -> int:
     depth = 0
@@ -25,24 +35,6 @@ def calc_depth(expr : ast.AST) -> int:
 
     return depth
 
-class PyFuncStats:
-
-    def __init__(self, func_ast : ast.FunctionDef):
-        self.func_ast : ast.FunctionDef = func_ast
-
-        self.args = self.func_ast.args.args 
-        
-        self.n_args = len(self.args)
-        self.n_args_annotated = 0
-        for arg in self.args:
-            if arg.annotation:
-                self.n_args_annotated += 1
-
-        self.depth = calc_depth(self.func_ast)
-
-    @property
-    def annotated_args_pct(self) -> float:
-        return self.n_args_annotated / self.n_args * 100
     
 @dataclass
 class FuncArgsStats:
@@ -57,11 +49,11 @@ def get_func_args_stats(func_ast : ast.FunctionDef) -> FuncArgsStats:
         n_func_args = len(func_ast.args.args),
         n_func_args_annotated = sum(arg.annotation is not None for arg in func_ast.args.args)
     )
-        
 
 
-@dataclass
-class FuncStats:
+
+class FuncStats(BaseModel):
+    name: str
     max_depth : int
     n_codelines : int
     n_func_args : int
@@ -74,7 +66,8 @@ def collect_func_stats(func_ast : ast.FunctionDef) -> FuncStats:
     func_arg_stats = get_func_args_stats(func_ast)
 
     return FuncStats(
-        max_depth=calc_depth(func_ast),
+        name=func_ast.name,
+        max_depth=calc_func_depth(func_ast),
         n_codelines = n_codelines,
         n_func_args = func_arg_stats.n_func_args,
         n_func_args_annotated = func_arg_stats.n_func_args_annotated,
@@ -84,73 +77,6 @@ def collect_func_stats(func_ast : ast.FunctionDef) -> FuncStats:
 
 def iter_func_asts(ast_mod : ast.Module) -> Iterable[ast.FunctionDef]:
     return filter(lambda x : type(x) is ast.FunctionDef, ast_mod.body)
-
-class PyFunc:
-
-    def __init__(self, func_ast : ast.FunctionDef):
-        self.func_ast : ast.FunctionDef = func_ast
-
-        self.calc_stats()
-
-    def calc_stats(self):
-        args = self.func_ast.args.args 
-        print(self.func_ast.args.args)
-        n_args = len(args)
-        n_args_annotated = 0
-        for arg in self.func_ast.args.args:
-            if arg.annotation:
-                n_args_annotated += 1
-        print(n_args, n_args_annotated)
-        PyFuncStats(self.func_ast)
-
-    @property
-    def name(self) -> str:
-        return self.func_ast.name
-
-class PyFile:
-
-    def __init__(self, py_filepath):
-        self.py_filepath : Path = py_filepath
-
-        self._parse()
-        self._analyze()
-
-    def _parse(self) -> None:
-        print('parsing')
-        with open(self.py_filepath, 'r') as f:
-            self.module_ast = ast.parse(f.read())
-            print(self.module_ast)
-
-    def _analyze(self):
-        self.py_funcs = list()
-        for elem in self.module_ast.body:
-            if type(elem) == ast.FunctionDef:
-                self.py_funcs.append( PyFunc(elem) )
-
-    @property
-    def name(self) -> str:
-        return self.py_filepath.name
-    
-    def __str__(self):
-        return self.name
-
-class Folder:
-
-    def __init__(self, folderpath : Path):
-        self.folderpath = folderpath
-
-        self.subfolders = []
-        self.py_files = []
-
-        for elem in self.folderpath.iterdir():
-            if elem.is_dir():
-                self.subfolders.append( Folder(elem) )
-            elif elem.is_file() and is_py_file(elem.name):
-                self.py_files.append( PyFile( elem ) )
-    
-    @property
-    def name(self) -> str:
-        return self.folderpath.name
     
 @dataclass
 class Dir:
@@ -161,7 +87,7 @@ class Dir:
 
     @property
     def name(self) -> str:
-        return self.folderpath.name
+        return self.dirpath.name
 
     
     def iter_all_pyfiles(self) -> Iterable[Path]:
@@ -197,6 +123,18 @@ def build_dir(dirpath : Path) -> Dir:
 class ModStats:
     funcs_stats : dict[str, FuncStats]
 
+    def gen_df(self) -> pl.DataFrame:
+        # import pdb; pdb.set_trace()
+
+        for stat in self.funcs_stats.values():
+            for name, member in inspect.getmembers(stat):
+                if isinstance(member, property):
+                    print(name)
+                    print(member)
+                    print()
+
+        return pl.DataFrame(stat for stat in self.funcs_stats.values())
+
 def collect_modstats(ast_mod : ast.Module) -> ModStats:
     funcs_stats : dict[str, FuncStats] = dict()
     for func_ast in iter_func_asts(ast_mod):
@@ -219,13 +157,16 @@ def print_func_stats(func_name : str, func_stats : FuncStats):
     print()
 
 
-def eval_pypath_mod(pypath):
+def eval_pypath_mod(pypath) -> pl.DataFrame:
     with open(pypath, 'r') as f:
         code = f.read()
     ast_mod = ast.parse(code)
     mod_stats = collect_modstats(ast_mod=ast_mod)
     for func_name, func_stats in mod_stats.funcs_stats.items():
         print_func_stats(func_name, func_stats)
+    # wouldn't it be nice to return the dataframe
+    df = mod_stats.gen_df()
+    return df
 
 
 
@@ -239,8 +180,12 @@ if __name__ == '__main__':
     folderpath = Path(sys.argv[1])
     
     dir = build_dir(folderpath)
+    dfs: list[pl.DataFrame] = list()
+    dfs_by_path: dict[Path, pl.DataFrame] = dict()
     for pypath in dir.iter_all_pyfiles():
-        eval_pypath_mod(pypath)
+        df = eval_pypath_mod(pypath)
+        dfs.append(df)
+        dfs_by_path[pypath] = df
 
-
-
+    # generate the final dataframe
+    final_df = pl.concat(df.with_columns() for path, df in dfs_by_path.items() )
