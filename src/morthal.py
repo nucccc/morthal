@@ -9,6 +9,7 @@ import polars as pl
 from pydantic import BaseModel
 
 
+# args out of which the depth is calculated
 DEPTH_ARGS = ['body', 'handlers', 'orelse', 'finalbody']
 
 
@@ -24,8 +25,8 @@ def calc_func_depth(func_ast: ast.FunctionDef) -> int:
 
 
 def calc_depth(expr : ast.AST) -> int:
-    if isinstance(expr, ast.Try):
-        import pdb; pdb.set_trace()
+    # TODO: add functionality to have nodes stopping stuff, like if you meet
+    # a function def stop there don't go further
 
     depth = 0
 
@@ -36,20 +37,7 @@ def calc_depth(expr : ast.AST) -> int:
         for child_expr in getattr(expr, arg):
             new_depth = 1 if arg != 'handlers' else 0
             new_depth += calc_depth(child_expr)
-            print(child_expr, new_depth)
             depth = max(depth, new_depth)
-    
-    '''
-    if hasattr(expr, 'body'):
-        for child_expr in expr.body:
-            new_depth = 1 + calc_depth(child_expr)
-            depth = max(depth, new_depth)
-    # i shall recursively handle also the elsexprs
-    if hasattr(expr, 'orelse'):
-        for elsexpr in expr.orelse:
-            new_depth = calc_depth(elsexpr)
-            depth = max(depth, new_depth)                        
-    '''
 
     return depth
 
