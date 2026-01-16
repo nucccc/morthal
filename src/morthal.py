@@ -9,6 +9,9 @@ import polars as pl
 from pydantic import BaseModel
 
 
+DEPTH_ARGS = ['body', 'handlers', 'orelse', 'finalbody']
+
+
 def is_py_file(filename : str) -> bool:
     '''
     is_py_file returns True if the filename is a python file
@@ -21,8 +24,22 @@ def calc_func_depth(func_ast: ast.FunctionDef) -> int:
 
 
 def calc_depth(expr : ast.AST) -> int:
+    if isinstance(expr, ast.Try):
+        import pdb; pdb.set_trace()
+
     depth = 0
+
+    for arg in DEPTH_ARGS:
+        if not hasattr(expr, arg):
+            continue
+
+        for child_expr in getattr(expr, arg):
+            new_depth = 1 if arg != 'handlers' else 0
+            new_depth += calc_depth(child_expr)
+            print(child_expr, new_depth)
+            depth = max(depth, new_depth)
     
+    '''
     if hasattr(expr, 'body'):
         for child_expr in expr.body:
             new_depth = 1 + calc_depth(child_expr)
@@ -32,6 +49,7 @@ def calc_depth(expr : ast.AST) -> int:
         for elsexpr in expr.orelse:
             new_depth = calc_depth(elsexpr)
             depth = max(depth, new_depth)                        
+    '''
 
     return depth
 
