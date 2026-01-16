@@ -4,29 +4,139 @@ from src.morthal import collect_func_stats, calc_func_depth
 
 
 def test_calc_func_depth():
-    func_ast = ast.parse('''def func_pass(i: int, j) -> None:
+    func_ast = ast.parse('''def func_pass():
     pass
     ''').body[0]
-
     assert calc_func_depth(func_ast) == 0
 
-    func_ast = ast.parse('''def simple_func(i: int, j) -> None:
+    func_ast = ast.parse('''def simple_func():
     if True:
         pass
     ''').body[0]
-
     assert calc_func_depth(func_ast) == 1
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 2
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            try:
+                pass
+            except:
+                pass
+            else:
+                pass
+            finally:
+                pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 3
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            try:
+                if True:
+                    pass
+            except:
+                pass
+            else:
+                pass
+            finally:
+                pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 4
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            try:
+                pass
+            except:
+                if True:
+                    pass
+            else:
+                pass
+            finally:
+                pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 4
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            try:
+                pass
+            except:
+                pass
+            else:
+                if True:
+                    pass
+            finally:
+                pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 4
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            try:
+                pass
+            except:
+                pass
+            else:
+                pass
+            finally:
+                if True:
+                    pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 4
+
+    func_ast = ast.parse('''def simple_func():
+    if True:
+        pass
+    else:
+        for j in range(9):
+            try:
+                pass
+            except:
+                pass
+            else:
+                pass
+            finally:
+                pass
+        else:
+            if True:
+                if True:
+                    if True:
+                        pass
+    ''').body[0]
+    assert calc_func_depth(func_ast) == 5
 
 
 def test_collect_func_stats():
-    f_mod = ast.parse('''def eventually_print_hello_world(i: int, j) -> None:
+    f_ast = ast.parse('''def eventually_print_hello_world(i: int, j) -> None:
     if i > 0:
         print('hello')
         if j > 0:
             print(' world')
-''')
-    
-    f_ast = f_mod.body[0]
+    ''').body[0]
 
     f_stats = collect_func_stats(f_ast)
 
@@ -38,7 +148,7 @@ def test_collect_func_stats():
     assert f_stats.return_annotated == True
 
 
-    f_mod = ast.parse('''def do_stuff() -> None:
+    f_ast = ast.parse('''def do_stuff() -> None:
     try:
         print('hello')
     except ValueError:
@@ -56,9 +166,7 @@ def test_collect_func_stats():
     finally:
         if not False:
             print('boh')
-''')
-    
-    f_ast = f_mod.body[0]
+    ''').body[0]
 
     f_stats = collect_func_stats(f_ast)
 
