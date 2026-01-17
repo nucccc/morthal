@@ -1,6 +1,6 @@
 import ast
 
-from src.morthal import collect_func_stats, calc_func_depth
+from morthal.stats import FuncStats, calc_func_depth
 
 
 def test_calc_func_depth():
@@ -138,7 +138,7 @@ def test_collect_func_stats():
             print(' world')
     ''').body[0]
 
-    f_stats = collect_func_stats(f_ast)
+    f_stats = FuncStats.from_ast(f_ast)
 
     assert f_stats.name == 'eventually_print_hello_world'
     assert f_stats.max_depth == 2
@@ -168,7 +168,7 @@ def test_collect_func_stats():
             print('boh')
     ''').body[0]
 
-    f_stats = collect_func_stats(f_ast)
+    f_stats = FuncStats.from_ast(f_ast)
 
     assert f_stats.name == 'do_stuff'
     assert f_stats.max_depth == 6
