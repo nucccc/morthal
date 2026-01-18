@@ -44,6 +44,9 @@ def parentify(
             # set elden to the ast_node
             elden = ast_node
 
+            # no need to go on
+            break
+
     for ast_child in ast.iter_child_nodes(ast_node):
         # ast_child.parent = ast_node
         parentify(
