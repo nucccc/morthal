@@ -1,6 +1,6 @@
 import ast
 
-from morthal.utils.ast import parentify
+from morthal.utils.ast import identify_tab_offset, parentify
 
 def verify_parents(ast_node: ast.AST, parent: ast.AST | None = None):
     if parent is not None:
@@ -200,3 +200,14 @@ def do_stuff() -> None:
     assert trfinal_if_pr.parent is trfinal_if
     assert trfinal_if_pr.elden is fdef
     assert trfinal_if_pr.depth == 3
+
+
+def test_identify_tab_offset():
+    assert identify_tab_offset(ast.parse('''import ast
+a = 0
+b = 1
+c = 2''')) == 0
+    
+    assert identify_tab_offset(ast.parse('''a = 0
+def a():
+    pass''')) == 4
