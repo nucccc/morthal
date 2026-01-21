@@ -211,3 +211,19 @@ c = 2''')) == 0
     assert identify_tab_offset(ast.parse('''a = 0
 def a():
     pass''')) == 4
+
+    assert identify_tab_offset(ast.parse('''try:
+    a = 0
+except ValueError:
+    a = 0
+
+if True:
+    for i in range(18):
+        pass
+    else:
+        pass
+elif False:
+    pass
+
+def a():
+    pass''')) == 4
