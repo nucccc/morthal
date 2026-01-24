@@ -2,10 +2,14 @@ import ast
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator
 
 import polars as pl
 from pydantic import BaseModel
+
+from morthal.utils.ast import identify_tab_offset, parentify
+from morthal.utils.calc import max_and_avg
+from morthal.utils.path import iter_pyfiles
 
 
 # args out of which the depth is calculated
@@ -34,6 +38,30 @@ def calc_depth(expr : ast.AST) -> int:
     return depth
 
 
+@dataclass
+class RepoData:
+    n_files: int
+    funcs_df: pl.DataFrame
+
+
+def collect_repo_data(root_path: Path) -> RepoData:
+    n_files = 0
+    dicts_list: list[dict[str, Any]] = []
+
+    for pypath in iter_pyfiles(root_path):
+        n_files += 1
+
+        for fdata in collect_stats(pypath):
+            # NOTE: maybe at a point use extend
+            dicts_list.append(fdata)
+
+    return RepoData(
+        n_files=n_files,
+        funcs_df=pl.DataFrame(dicts_list)
+    )
+
+
+
 # NOTE: a little bit of over engineering...  
 @dataclass
 class FuncArgsStats:
@@ -58,77 +86,74 @@ def count_exprs(func_ast: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     return count
 
 
-@dataclass
-class ModExploration:
-    pass
-
-
-def explore_mod(ast_mod: ast.Module, code: str) -> ModExploration:
-    pass
-
-
 class FuncStats(BaseModel):
     name: str
-    max_depth : int
-    n_codelines : int
-    n_exprs : int
+    parent_name: str | None
+    name_len: int
+    max_node_depth: int
+    max_stmt_depth: int
+    avg_node_depth: float
+    avg_stmt_depth: float
+    n_codelines: int
+    n_exprs: int
+    n_nodes: int
     n_func_args : int
     n_func_args_annotated : int
     return_annotated : bool
-    _docstring: str | None = None
+    docstring: str | None = None
 
     @classmethod
-    def from_ast(cls, func_ast : ast.FunctionDef) -> 'FuncStats':
+    def from_ast(cls, func_ast : ast.FunctionDef, tab_offset: int) -> 'FuncStats':
+        '''
+        this shall assume the ast was "parentified"
+        '''
         n_codelines = func_ast.end_lineno - func_ast.lineno
         func_arg_stats = get_func_args_stats(func_ast)
 
+        max_node_depth, avg_node_depth = max_and_avg(func_ast.relative_node_depths)
+        max_stmt_depth, avg_stmt_depth = max_and_avg(func_ast.relative_stmt_depths)
+
+        if tab_offset > 0:
+            max_stmt_depth = int(max_stmt_depth / tab_offset)
+            avg_stmt_depth = avg_stmt_depth / tab_offset
+
+        parent_name = None
+        if hasattr(func_ast, 'elden') and hasattr(func_ast.elden, 'name'):
+            parent_name = func_ast.elden.name
+
         return FuncStats(
             name=func_ast.name,
-            max_depth=calc_func_depth(func_ast),
+            parent_name=parent_name,
+            name_len=len(func_ast.name),
+            max_node_depth=max_node_depth,
+            max_stmt_depth=max_stmt_depth,
+            avg_node_depth=avg_node_depth,
+            avg_stmt_depth=avg_stmt_depth,
             n_codelines = n_codelines,
-            n_exprs=count_exprs(func_ast),
+            n_exprs=len(func_ast.relative_stmt_depths),
+            n_nodes=len(func_ast.relative_node_depths),
             n_func_args = func_arg_stats.n_func_args,
             n_func_args_annotated = func_arg_stats.n_func_args_annotated,
             return_annotated = func_ast.returns is not None,
-            _docstring = ast.get_docstring(func_ast)
+            docstring = ast.get_docstring(func_ast)
         )
+    
 
+# NOTE: at the moment only func stats are returned for a pypath, but one day if
+# class stats or other stuff is collected
+def collect_stats(pypath: Path) -> Generator[dict[str, Any], None, None]:
+    ast_mod = ast.parse(pypath.read_text())
+    parentify(ast_mod)
 
-def collect_func_stats(ast_mod : ast.Module) -> Generator[FuncStats, None, None]:
+    tab_offset = identify_tab_offset(ast_mod)
+    pypath_add = {"fpath":str(pypath)}
+
+    for fstats in collect_func_stats(ast_mod, tab_offset):
+        fdata = fstats.model_dump()
+        fdata.update(pypath_add)
+        yield fdata
+
+def collect_func_stats(ast_mod: ast.Module, tab_offset: int) -> Generator[FuncStats, None, None]:
     for ast_node in ast.walk(ast_mod):
         if isinstance(ast_node, ast.FunctionDef) or isinstance(ast_node, ast.AsyncFunctionDef):
-            yield FuncStats.from_ast(ast_node)
-
-
-def eval_pypath_mod(pypath) -> pl.DataFrame:
-    with open(pypath, 'r') as f:
-        code = f.read()
-    ast_mod = ast.parse(code)
-    mod_stats = collect_modstats(ast_mod=ast_mod)
-    for func_name, func_stats in mod_stats.funcs_stats.items():
-        print_func_stats(func_name, func_stats)
-    # wouldn't it be nice to return the dataframe
-    df = mod_stats.gen_df()
-    return df
-
-
-
-if __name__ == '__main__':
-    print('codestats')
-    n = len(sys.argv)
-    for i in range(1, n):
-        print(sys.argv[i])
-    if n < 2:
-        print('not enough commands')
-    folderpath = Path(sys.argv[1])
-    
-    dir = build_dir(folderpath)
-    dfs: list[pl.DataFrame] = list()
-    dfs_by_path: dict[Path, pl.DataFrame] = dict()
-    for pypath in dir.iter_all_pyfiles():
-        df = eval_pypath_mod(pypath)
-        dfs.append(df)
-        dfs_by_path[pypath] = df
-
-    # generate the final dataframe
-    final_df = pl.concat(df.with_columns() for path, df in dfs_by_path.items() )
+            yield FuncStats.from_ast(ast_node, tab_offset)

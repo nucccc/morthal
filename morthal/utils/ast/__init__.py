@@ -37,7 +37,7 @@ def parentify(
             
             elden_col_offset = 0 if isinstance(elden, ast.Module) else elden.col_offset
 
-            elden.relative_col_depths.append(ast_node.col_offset - elden_col_offset)
+            elden.relative_stmt_depths.append(ast_node.col_offset - elden_col_offset)
 
     # updating elden in case the node type is of type elden
     for elden_type in ELDEN_TYPES:
@@ -45,7 +45,7 @@ def parentify(
             # make ast_node an elden
             ast_node.relative_node_depths = []
             ast_node.relative_expr_depths = []
-            ast_node.relative_col_depths = []
+            ast_node.relative_stmt_depths = []
             # set elden to the ast_node
             elden = ast_node
 
