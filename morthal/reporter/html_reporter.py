@@ -9,6 +9,7 @@ from typing import Any
 
 import polars as pl
 
+from morthal.analyzer import RepoRecap
 from .templates import get_html_template
 
 
@@ -21,94 +22,93 @@ class HTMLReporter:
     LINES_LONG = 50
     COMPLEXITY_HIGH = 100  # n_nodes threshold
     
-    def __init__(self, df: pl.DataFrame):
+    def __init__(self, recap: RepoRecap):
         """
-        Initialize reporter with a Polars DataFrame
+        Initialize reporter with a Polars DataFrame and summary statistics
         
         Args:
             df: DataFrame containing function statistics
+            recap: RepoRecap with pre-calculated summary statistics
         """
-        self.df = df
+        self.df = recap.funcs_df
+        self.recap = recap
+        # Determine which depth column to use
+        self.depth_col = 'max_stmt_depth'
         
     @classmethod
-    def from_csv(cls, csv_path: str | Path) -> 'HTMLReporter':
+    def from_csv(cls, csv_path: str | Path, recap: RepoRecap | None = None) -> 'HTMLReporter':
         """
         Create reporter from CSV file
         
         Args:
             csv_path: Path to CSV file containing function statistics
+            recap: Optional pre-calculated RepoRecap. If None, will be calculated from the DataFrame.
             
         Returns:
             HTMLReporter instance
         """
+        from morthal.analyzer import build_repo_recap
+        from morthal.stats import RepoData
+        
         df = pl.read_csv(csv_path)
-        return cls(df)
+        
+        if recap is None:
+            # Build recap from the DataFrame
+            repo_data = RepoData(n_files=0, funcs_df=df)
+            recap = build_repo_recap(repo_data, depth_high=cls.DEPTH_HIGH, lines_long=cls.LINES_LONG)
+        
+        return cls(df, recap)
     
     def _generate_summary_cards(self) -> str:
-        """Generate HTML for summary statistics cards"""
-        total_funcs = len(self.df)
-        avg_depth = self.df['max_depth'].mean()
-        median_depth = self.df['max_depth'].median()
-        avg_lines = self.df['n_codelines'].mean()
-        
-        # Calculate annotation coverage
-        total_args = self.df['n_func_args'].sum()
-        annotated_args = self.df['n_func_args_annotated'].sum()
-        arg_coverage = (annotated_args / total_args * 100) if total_args > 0 else 0
-        
-        return_coverage = (self.df['return_annotated'].sum() / total_funcs * 100) if total_funcs > 0 else 0
-        
-        # Count tech debt indicators
-        deep_funcs = len(self.df.filter(pl.col('max_depth') >= self.DEPTH_HIGH))
-        long_funcs = len(self.df.filter(pl.col('n_codelines') > self.LINES_LONG))
-        unannotated = len(self.df.filter(~pl.col('return_annotated')))
+        """Generate HTML for summary statistics cards using pre-calculated RepoRecap data"""
+        r = self.recap  # shorthand for easier access
         
         cards = f"""
         <div class="summary-card">
             <h3>Total Functions</h3>
-            <div class="value">{total_funcs}</div>
+            <div class="value">{r.total_funcs}</div>
             <div class="subtext">analyzed in codebase</div>
         </div>
         
         <div class="summary-card">
             <h3>Average Depth</h3>
-            <div class="value">{avg_depth:.1f}</div>
-            <div class="subtext">median: {median_depth:.0f}</div>
+            <div class="value">{r.avg_depth:.1f}</div>
+            <div class="subtext">median: {r.median_depth:.0f}</div>
         </div>
         
         <div class="summary-card">
             <h3>Average Lines</h3>
-            <div class="value">{avg_lines:.0f}</div>
+            <div class="value">{r.avg_lines:.0f}</div>
             <div class="subtext">per function</div>
         </div>
         
         <div class="summary-card">
             <h3>Argument Annotations</h3>
-            <div class="value">{arg_coverage:.0f}%</div>
-            <div class="subtext">{annotated_args} of {total_args} args</div>
+            <div class="value">{r.arg_coverage:.0f}%</div>
+            <div class="subtext">{r.annotated_args} of {r.total_args} args</div>
         </div>
         
         <div class="summary-card">
             <h3>Return Annotations</h3>
-            <div class="value">{return_coverage:.0f}%</div>
-            <div class="subtext">{int(self.df['return_annotated'].sum())} of {total_funcs} funcs</div>
+            <div class="value">{r.return_coverage:.0f}%</div>
+            <div class="subtext">{r.total_funcs - r.unannotated_funcs} of {r.total_funcs} funcs</div>
         </div>
         
         <div class="summary-card">
             <h3>Deep Nesting</h3>
-            <div class="value">{deep_funcs}</div>
-            <div class="subtext">depth ≥ {self.DEPTH_HIGH}</div>
+            <div class="value">{r.deep_funcs}</div>
+            <div class="subtext">depth ≥ {r.depth_threshold}</div>
         </div>
         
         <div class="summary-card">
             <h3>Long Functions</h3>
-            <div class="value">{long_funcs}</div>
-            <div class="subtext">&gt; {self.LINES_LONG} lines</div>
+            <div class="value">{r.long_funcs}</div>
+            <div class="subtext">&gt; {r.lines_threshold} lines</div>
         </div>
         
         <div class="summary-card">
             <h3>Missing Return Type</h3>
-            <div class="value">{unannotated}</div>
+            <div class="value">{r.unannotated_funcs}</div>
             <div class="subtext">functions without type hints</div>
         </div>
         """
@@ -121,15 +121,16 @@ class HTMLReporter:
         
         # Critical: Deep nesting AND long functions
         critical = self.df.filter(
-            (pl.col('max_depth') >= self.DEPTH_HIGH) & 
+            (pl.col(self.depth_col) >= self.DEPTH_HIGH) & 
             (pl.col('n_codelines') > self.LINES_LONG)
-        ).sort('max_depth', descending=True).head(10)
+        ).sort(self.depth_col, descending=True).head(10)
         
         for row in critical.iter_rows(named=True):
+            depth_value = row.get('max_depth', row.get('max_stmt_depth'))
             items.append(f"""
             <li class="tech-debt-item critical">
                 <strong>🔴 Critical: {row['name']}</strong>
-                Deep nesting ({row['max_depth']}) + Long function ({row['n_codelines']} lines)
+                Deep nesting ({depth_value}) + Long function ({row['n_codelines']} lines)
                 <div class="file-path">{row['fpath']}</div>
             </li>
             """)
@@ -199,11 +200,12 @@ class HTMLReporter:
     def _generate_table_rows(self) -> str:
         """Generate HTML table rows for all functions"""
         # Sort by depth by default
-        sorted_df = self.df.sort('max_depth', descending=True)
+        sorted_df = self.df.sort(self.depth_col, descending=True)
         
         rows = []
         for row in sorted_df.iter_rows(named=True):
-            depth_badge = self._get_depth_badge(row['max_depth'])
+            depth_value = row.get('max_depth', row.get('max_stmt_depth', 0))
+            depth_badge = self._get_depth_badge(int(depth_value))
             annotation = self._get_annotation_indicator(
                 row['n_func_args_annotated'],
                 row['n_func_args'],
@@ -216,7 +218,7 @@ class HTMLReporter:
             
             rows.append(f"""
             <tr data-name="{row['name']}" 
-                data-max_depth="{row['max_depth']}" 
+                data-max_depth="{depth_value}" 
                 data-n_codelines="{row['n_codelines']}"
                 data-n_exprs="{row['n_exprs']}"
                 data-n_nodes="{row['n_nodes']}"
