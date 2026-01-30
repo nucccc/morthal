@@ -12,32 +12,6 @@ from morthal.utils.calc import max_and_avg
 from morthal.utils.path import iter_pyfiles
 
 
-# args out of which the depth is calculated
-DEPTH_ARGS = ['body', 'handlers', 'orelse', 'finalbody']
-
-
-def calc_func_depth(func_ast: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
-    return max(calc_depth(expr) for expr in func_ast.body)
-
-
-def calc_depth(expr : ast.AST) -> int:
-    # TODO: add functionality to have nodes stopping stuff, like if you meet
-    # a function def stop there don't go further
-
-    depth = 0
-
-    for arg in DEPTH_ARGS:
-        if not hasattr(expr, arg):
-            continue
-
-        for child_expr in getattr(expr, arg):
-            new_depth = 1 if arg != 'handlers' else 0
-            new_depth += calc_depth(child_expr)
-            depth = max(depth, new_depth)
-
-    return depth
-
-
 @dataclass
 class RepoData:
     n_files: int
