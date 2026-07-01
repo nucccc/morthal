@@ -35,17 +35,44 @@ class CodeRecap:
 
     def save(self, path: Path):
         self.funcs_df.write_parquet(path / "funcs.parquet")
-        with open(path / "fpath.json", "w") as f:
+        with open(path / "recap.json", "w") as f:
             json.dump({
-                'total_funcs':self.total_funcs,
-                'avg_depth':self.avg_depth,
-                'median_depth':self.median_depth,
-                'avg_lines':self.avg_lines,
-                'total_args':self.total_args,
-                'annotated_args':self.annotated_args,
-                'arg_coverage':self.arg_coverage,
-                'return_coverage':self.return_coverage,
+                'total_funcs': self.total_funcs,
+                'avg_depth': self.avg_depth,
+                'median_depth': self.median_depth,
+                'avg_lines': self.avg_lines,
+                'total_args': self.total_args,
+                'annotated_args': self.annotated_args,
+                'arg_coverage': self.arg_coverage,
+                'return_coverage': self.return_coverage,
+                'deep_funcs': self.deep_funcs,
+                'long_funcs': self.long_funcs,
+                'unannotated_funcs': self.unannotated_funcs,
+                'depth_threshold': self.depth_threshold,
+                'lines_threshold': self.lines_threshold,
             }, f)
+
+    @classmethod
+    def load(cls, path: Path) -> 'CodeRecap':
+        funcs_df = pl.read_parquet(path / "funcs.parquet")
+        with open(path / "recap.json") as f:
+            data = json.load(f)
+        return cls(
+            total_funcs=data['total_funcs'],
+            avg_depth=data['avg_depth'],
+            median_depth=data['median_depth'],
+            avg_lines=data['avg_lines'],
+            total_args=data['total_args'],
+            annotated_args=data['annotated_args'],
+            arg_coverage=data['arg_coverage'],
+            return_coverage=data['return_coverage'],
+            deep_funcs=data['deep_funcs'],
+            long_funcs=data['long_funcs'],
+            unannotated_funcs=data['unannotated_funcs'],
+            depth_threshold=data['depth_threshold'],
+            lines_threshold=data['lines_threshold'],
+            funcs_df=funcs_df,
+        )
         
 
 
@@ -106,7 +133,7 @@ def build_repo_recap(
     )
 
 
-dataclass
+@dataclass
 class Commit:
     hash: str
     dt: datetime
