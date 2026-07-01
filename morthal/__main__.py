@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from .stats import collect_repo_data
-from .analyzer import build_repo_recap
+from .analyze.collect import collect_repo_data
+from .analyze.recap import build_repo_recap
 from .reporter import HTMLReporter
 
 default_path = "/home/nucccc/cod/projs/sqlmodelgen/src"

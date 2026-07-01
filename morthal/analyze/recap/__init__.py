@@ -2,15 +2,18 @@
 analyzer shall account for tha analysis of collected function data
 '''
 
+import json
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 import polars as pl
 
-from morthal.stats import RepoData
+from morthal.analyze.collect import CodeData
 
 
 @dataclass
-class RepoRecap:
+class CodeRecap:
     """Summary statistics for repository analysis"""
     total_funcs: int
     avg_depth: float
@@ -30,12 +33,28 @@ class RepoRecap:
 
     funcs_df: pl.DataFrame
 
+    def save(self, path: Path):
+        self.funcs_df.write_parquet(path / "funcs.parquet")
+        with open(path / "fpath.json", "w") as f:
+            json.dump({
+                'total_funcs':self.total_funcs,
+                'avg_depth':self.avg_depth,
+                'median_depth':self.median_depth,
+                'avg_lines':self.avg_lines,
+                'total_args':self.total_args,
+                'annotated_args':self.annotated_args,
+                'arg_coverage':self.arg_coverage,
+                'return_coverage':self.return_coverage,
+            }, f)
+        
+
+
 
 def build_repo_recap(
-    repo_data: RepoData,
+    repo_data: CodeData,
     depth_high: int = 5,
     lines_long: int = 50
-) -> RepoRecap:
+) -> CodeRecap:
     """
     Build a repository recap with summary statistics from repo data.
     
@@ -69,7 +88,7 @@ def build_repo_recap(
     long_funcs = len(df.filter(pl.col('n_codelines') > lines_long))
     unannotated_funcs = len(df.filter(~pl.col('return_annotated')))
     
-    return RepoRecap(
+    return CodeRecap(
         total_funcs=total_funcs,
         avg_depth=avg_depth,
         median_depth=median_depth,
@@ -85,3 +104,15 @@ def build_repo_recap(
         lines_threshold=lines_long,
         funcs_df=df
     )
+
+
+dataclass
+class Commit:
+    hash: str
+    dt: datetime
+
+
+
+@dataclass
+class RepoHistory:
+    history: list[tuple[Commit, CodeRecap]]

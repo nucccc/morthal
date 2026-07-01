@@ -13,12 +13,12 @@ from morthal.utils.path import iter_pyfiles
 
 
 @dataclass
-class RepoData:
+class CodeData:
     n_files: int
     funcs_df: pl.DataFrame
 
 
-def collect_repo_data(root_path: Path) -> RepoData:
+def collect_repo_data(root_path: Path) -> CodeData:
     n_files = 0
     dicts_list: list[dict[str, Any]] = []
 
@@ -29,7 +29,7 @@ def collect_repo_data(root_path: Path) -> RepoData:
             # NOTE: maybe at a point use extend
             dicts_list.append(fdata)
 
-    return RepoData(
+    return CodeData(
         n_files=n_files,
         funcs_df=pl.DataFrame(dicts_list)
     )

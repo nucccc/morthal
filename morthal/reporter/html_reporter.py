@@ -9,7 +9,8 @@ from typing import Any
 
 import polars as pl
 
-from morthal.analyzer import RepoRecap
+from morthal.analyze.recap import CodeRecap
+from .plotting import gen_plots
 from .templates import get_html_template
 
 
@@ -22,7 +23,7 @@ class HTMLReporter:
     LINES_LONG = 50
     COMPLEXITY_HIGH = 100  # n_nodes threshold
     
-    def __init__(self, recap: RepoRecap):
+    def __init__(self, recap: CodeRecap):
         """
         Initialize reporter with a Polars DataFrame and summary statistics
         
@@ -36,7 +37,7 @@ class HTMLReporter:
         self.depth_col = 'max_stmt_depth'
         
     @classmethod
-    def from_csv(cls, csv_path: str | Path, recap: RepoRecap | None = None) -> 'HTMLReporter':
+    def from_csv(cls, csv_path: str | Path, recap: CodeRecap | None = None) -> 'HTMLReporter':
         """
         Create reporter from CSV file
         
@@ -47,14 +48,15 @@ class HTMLReporter:
         Returns:
             HTMLReporter instance
         """
-        from morthal.analyzer import build_repo_recap
-        from morthal.stats import RepoData
+
+        from morthal.analyze.collect import CodeData
+        from morthal.analyze.recap import build_repo_recap
         
         df = pl.read_csv(csv_path)
         
         if recap is None:
             # Build recap from the DataFrame
-            repo_data = RepoData(n_files=0, funcs_df=df)
+            repo_data = CodeData(n_files=0, funcs_df=df)
             recap = build_repo_recap(repo_data, depth_high=cls.DEPTH_HIGH, lines_long=cls.LINES_LONG)
         
         return cls(df, recap)
@@ -248,6 +250,9 @@ class HTMLReporter:
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        # while we're here let's generate some dumb dist plots
+        gen_plots(self.recap.funcs_df)
+
         # Generate all components
         summary_cards = self._generate_summary_cards()
         tech_debt_items = self._generate_tech_debt_items()
