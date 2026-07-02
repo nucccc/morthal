@@ -137,9 +137,34 @@ def build_repo_recap(
 class Commit:
     hash: str
     dt: datetime
-
+    author: str
+    message: str
 
 
 @dataclass
 class RepoHistory:
     history: list[tuple[Commit, CodeRecap]]
+
+    def to_csv(self, path: Path) -> None:
+        import polars as pl
+        rows = [
+            {
+                'commit_hash': c.hash,
+                'datetime': c.dt.isoformat(),
+                'author': c.author,
+                'message': c.message,
+                'total_funcs': r.total_funcs,
+                'avg_depth': r.avg_depth,
+                'median_depth': r.median_depth,
+                'avg_lines': r.avg_lines,
+                'total_args': r.total_args,
+                'annotated_args': r.annotated_args,
+                'arg_coverage': r.arg_coverage,
+                'return_coverage': r.return_coverage,
+                'deep_funcs': r.deep_funcs,
+                'long_funcs': r.long_funcs,
+                'unannotated_funcs': r.unannotated_funcs,
+            }
+            for c, r in self.history
+        ]
+        pl.DataFrame(rows).write_csv(path)

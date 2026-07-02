@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from morthal.utils.ast import identify_tab_offset, parentify
 from morthal.utils.calc import max_and_avg
+from morthal.utils.df import empty_df_from_model
 from morthal.utils.path import iter_pyfiles
 
 
@@ -31,10 +32,13 @@ def collect_repo_data(root_path: Path) -> CodeData:
 
     return CodeData(
         n_files=n_files,
-        funcs_df=pl.DataFrame(dicts_list)
+        funcs_df=funcs_dict_to_df(dicts_list)
     )
 
-
+def funcs_dict_to_df(dicts_list: list[dict[str, Any]]) -> pl.DataFrame:
+    if len(dicts_list) == 0:
+        return empty_df_from_model(FuncStats)
+    return pl.DataFrame(dicts_list)
 
 # NOTE: a little bit of over engineering...  
 @dataclass
