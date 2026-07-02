@@ -2,7 +2,6 @@
 analyzer shall account for tha analysis of collected function data
 '''
 
-import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -26,54 +25,12 @@ class CodeRecap:
     deep_funcs: int  # functions with depth >= threshold
     long_funcs: int  # functions with lines > threshold
     unannotated_funcs: int  # functions without return type
-    
+
     # Store thresholds used for calculations
     depth_threshold: int
     lines_threshold: int
 
     funcs_df: pl.DataFrame
-
-    def save(self, path: Path):
-        self.funcs_df.write_parquet(path / "funcs.parquet")
-        with open(path / "recap.json", "w") as f:
-            json.dump({
-                'total_funcs': self.total_funcs,
-                'avg_depth': self.avg_depth,
-                'median_depth': self.median_depth,
-                'avg_lines': self.avg_lines,
-                'total_args': self.total_args,
-                'annotated_args': self.annotated_args,
-                'arg_coverage': self.arg_coverage,
-                'return_coverage': self.return_coverage,
-                'deep_funcs': self.deep_funcs,
-                'long_funcs': self.long_funcs,
-                'unannotated_funcs': self.unannotated_funcs,
-                'depth_threshold': self.depth_threshold,
-                'lines_threshold': self.lines_threshold,
-            }, f)
-
-    @classmethod
-    def load(cls, path: Path) -> 'CodeRecap':
-        funcs_df = pl.read_parquet(path / "funcs.parquet")
-        with open(path / "recap.json") as f:
-            data = json.load(f)
-        return cls(
-            total_funcs=data['total_funcs'],
-            avg_depth=data['avg_depth'],
-            median_depth=data['median_depth'],
-            avg_lines=data['avg_lines'],
-            total_args=data['total_args'],
-            annotated_args=data['annotated_args'],
-            arg_coverage=data['arg_coverage'],
-            return_coverage=data['return_coverage'],
-            deep_funcs=data['deep_funcs'],
-            long_funcs=data['long_funcs'],
-            unannotated_funcs=data['unannotated_funcs'],
-            depth_threshold=data['depth_threshold'],
-            lines_threshold=data['lines_threshold'],
-            funcs_df=funcs_df,
-        )
-        
 
 
 
@@ -109,7 +66,7 @@ def build_repo_recap(
     annotated_args = int(df['n_func_args_annotated'].sum())  # type: ignore
     arg_coverage = (annotated_args / total_args * 100) if total_args > 0 else 0.0
     return_coverage = (df['return_annotated'].sum() / total_funcs * 100) if total_funcs > 0 else 0.0
-    
+
     # Tech debt indicators
     deep_funcs = len(df.filter(pl.col(depth_col) >= depth_high))
     long_funcs = len(df.filter(pl.col('n_codelines') > lines_long))

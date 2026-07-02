@@ -1,7 +1,6 @@
 """Morthal CLI — Python code analysis toolkit"""
 
 import argparse
-import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -9,22 +8,10 @@ from pathlib import Path
 from git import Repo
 
 from .analyze.collect import collect_repo_data
-from .analyze.recap import CodeRecap, Commit, RepoHistory, build_repo_recap
+from .analyze.recap import Commit, RepoHistory, build_repo_recap
 from .reporter import HTMLReporter
+from .utils.store import Store
 from .vcs import normalize_url, clone_repo, iter_pyfile_commits, extract_py_files
-
-
-def _manifest_matches(path: Path, target: str) -> bool:
-    try:
-        return json.loads(path.read_text()).get("target") == target
-    except (FileNotFoundError, json.JSONDecodeError):
-        return False
-
-
-def _write_manifest(path: Path, target: str) -> None:
-    path.write_text(
-        json.dumps({"target": target, "analyzed_at": datetime.now().isoformat()})
-    )
 
 
 def _walk_commit_history(repo_path: Path) -> RepoHistory:
@@ -54,30 +41,23 @@ def _walk_commit_history(repo_path: Path) -> RepoHistory:
 
 
 def handle(target_path: Path, args: argparse.Namespace) -> None:
-    support_dir = args.support_dir
-    support_dir.mkdir(parents=True, exist_ok=True)
+    store = Store(args.support_dir, str(target_path.resolve()), force=args.force)
 
-    manifest_path = support_dir / ".manifest.json"
-    target_str = str(target_path.resolve())
-
-    cached = (support_dir / "funcs.parquet").exists()
-
-    if cached and not args.force and _manifest_matches(manifest_path, target_str):
-        recap = CodeRecap.load(support_dir)
+    if store.has_cached_recap:
+        recap = store.load_recap()
     else:
         repo_data = collect_repo_data(target_path)
         recap = build_repo_recap(repo_data)
-        recap.save(support_dir)
-        _write_manifest(manifest_path, target_str)
+        store.save_recap(recap)
 
     if args.report:
         reporter = HTMLReporter(recap)
-        reporter.generate(support_dir / "report.html")
+        reporter.generate(store.path / "report.html")
 
     if args.history:
         print("Walking commit history ...")
         history = _walk_commit_history(target_path)
-        csv_path = support_dir / "commit_history.csv"
+        csv_path = store.path / "commit_history.csv"
         history.to_csv(csv_path)
         print(f"Commit history saved to: {csv_path.resolve()}")
 

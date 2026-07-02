@@ -7,21 +7,32 @@ import polars as pl
 from morthal.analyze.recap import CodeRecap
 
 
+_CACHE_FILES = ["funcs.parquet", "recap.json", ".manifest.json"]
+
+
 class Store:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, target: str, force: bool = False) -> None:
         self.path = path
         path.mkdir(parents=True, exist_ok=True)
 
-    def manifest_matches(self, target: str) -> bool:
+        if force or not self._manifest_matches(target):
+            self._clear_cache()
+            self._write_manifest(target)
+
+    def _manifest_matches(self, target: str) -> bool:
         try:
             return json.loads(self._manifest_path.read_text()).get("target") == target
         except (FileNotFoundError, json.JSONDecodeError):
             return False
 
-    def write_manifest(self, target: str) -> None:
+    def _write_manifest(self, target: str) -> None:
         self._manifest_path.write_text(
             json.dumps({"target": target, "analyzed_at": datetime.now().isoformat()})
         )
+
+    def _clear_cache(self) -> None:
+        for name in _CACHE_FILES:
+            (self.path / name).unlink(missing_ok=True)
 
     @property
     def has_cached_recap(self) -> bool:
