@@ -40,8 +40,15 @@ def _walk_commit_history(repo_path: Path) -> RepoHistory:
     return history
 
 
-def handle(target_path: Path, args: argparse.Namespace) -> None:
-    store = Store(args.support_dir, str(target_path.resolve()), force=args.force)
+def handle(
+    target_path: Path,
+    support_path: Path,
+    force: bool,
+    report: bool,
+    history: bool,
+    # args: argparse.Namespace,
+) -> None:
+    store = Store(support_path, str(target_path.resolve()), force=force)
 
     if store.has_cached_recap:
         recap = store.load_recap()
@@ -50,11 +57,11 @@ def handle(target_path: Path, args: argparse.Namespace) -> None:
         recap = build_repo_recap(repo_data)
         store.save_recap(recap)
 
-    if args.report:
+    if report:
         reporter = HTMLReporter(recap)
         reporter.generate(store.path / "report.html")
 
-    if args.history:
+    if history:
         print("Walking commit history ...")
         history = _walk_commit_history(target_path)
         csv_path = store.path / "commit_history.csv"
@@ -116,12 +123,24 @@ def main() -> None:
             print(f"Cloned to {clone_path}")
             if not args.support_dir:
                 args.support_dir = Path(".morthal")
-            handle(clone_path, args)
+            handle(
+                target_path=clone_path,
+                support_path=args.support_dir,
+                force=args.force,
+                report=args.report,
+                history=args.history,
+            )
     else:
         target_path = args.path or Path(".")
         if not args.support_dir:
             args.support_dir = target_path / ".morthal"
-        handle(target_path, args)
+        handle(
+            target_path=target_path,
+            support_path=args.support_dir,
+            force=args.force,
+            report=args.report,
+            history=args.history,
+        )
 
 
 if __name__ == "__main__":
