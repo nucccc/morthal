@@ -50,11 +50,7 @@ class Store:
                 "annotated_args": recap.annotated_args,
                 "arg_coverage": recap.arg_coverage,
                 "return_coverage": recap.return_coverage,
-                "deep_funcs": recap.deep_funcs,
-                "long_funcs": recap.long_funcs,
                 "unannotated_funcs": recap.unannotated_funcs,
-                "depth_threshold": recap.depth_threshold,
-                "lines_threshold": recap.lines_threshold,
             }, f)
 
     def load_recap(self) -> CodeRecap:
@@ -70,11 +66,7 @@ class Store:
             annotated_args=data["annotated_args"],
             arg_coverage=data["arg_coverage"],
             return_coverage=data["return_coverage"],
-            deep_funcs=data["deep_funcs"],
-            long_funcs=data["long_funcs"],
             unannotated_funcs=data["unannotated_funcs"],
-            depth_threshold=data["depth_threshold"],
-            lines_threshold=data["lines_threshold"],
             funcs_df=funcs_df,
         )
 

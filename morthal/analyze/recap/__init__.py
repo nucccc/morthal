@@ -22,13 +22,7 @@ class CodeRecap:
     annotated_args: int
     arg_coverage: float  # percentage
     return_coverage: float  # percentage
-    deep_funcs: int  # functions with depth >= threshold
-    long_funcs: int  # functions with lines > threshold
     unannotated_funcs: int  # functions without return type
-
-    # Store thresholds used for calculations
-    depth_threshold: int
-    lines_threshold: int
 
     funcs_df: pl.DataFrame
 
@@ -36,8 +30,6 @@ class CodeRecap:
 
 def build_repo_recap(
     repo_data: CodeData,
-    depth_high: int = 5,
-    lines_long: int = 50
 ) -> CodeRecap:
     """
     Build a repository recap with summary statistics from repo data.
@@ -68,8 +60,6 @@ def build_repo_recap(
     return_coverage = (df['return_annotated'].sum() / total_funcs * 100) if total_funcs > 0 else 0.0
 
     # Tech debt indicators
-    deep_funcs = len(df.filter(pl.col(depth_col) >= depth_high))
-    long_funcs = len(df.filter(pl.col('n_codelines') > lines_long))
     unannotated_funcs = len(df.filter(~pl.col('return_annotated')))
     
     return CodeRecap(
@@ -81,11 +71,7 @@ def build_repo_recap(
         annotated_args=annotated_args,
         arg_coverage=arg_coverage,
         return_coverage=return_coverage,
-        deep_funcs=deep_funcs,
-        long_funcs=long_funcs,
         unannotated_funcs=unannotated_funcs,
-        depth_threshold=depth_high,
-        lines_threshold=lines_long,
         funcs_df=df
     )
 
@@ -118,8 +104,6 @@ class RepoHistory:
                 'annotated_args': r.annotated_args,
                 'arg_coverage': r.arg_coverage,
                 'return_coverage': r.return_coverage,
-                'deep_funcs': r.deep_funcs,
-                'long_funcs': r.long_funcs,
                 'unannotated_funcs': r.unannotated_funcs,
             }
             for c, r in self.history

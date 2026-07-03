@@ -22,11 +22,7 @@ def test_store_caches_and_loads_recap(tmpdir):
         annotated_args=15,
         arg_coverage=75.0,
         return_coverage=80.0,
-        deep_funcs=1,
-        long_funcs=2,
         unannotated_funcs=3,
-        depth_threshold=5,
-        lines_threshold=50,
         funcs_df=pl.DataFrame({"x": [1, 2, 3]}),
     )
     store.save_recap(recap)
@@ -49,11 +45,7 @@ def test_store_mismatched_target_clears_cache(tmpdir):
         annotated_args=5,
         arg_coverage=100.0,
         return_coverage=100.0,
-        deep_funcs=0,
-        long_funcs=0,
         unannotated_funcs=0,
-        depth_threshold=5,
-        lines_threshold=50,
         funcs_df=pl.DataFrame({"x": [1]}),
     )
     store.save_recap(recap)
@@ -75,11 +67,7 @@ def test_store_force_clears_cache(tmpdir):
         annotated_args=5,
         arg_coverage=100.0,
         return_coverage=100.0,
-        deep_funcs=0,
-        long_funcs=0,
         unannotated_funcs=0,
-        depth_threshold=5,
-        lines_threshold=50,
         funcs_df=pl.DataFrame({"x": [1]}),
     )
     store.save_recap(recap)
@@ -101,11 +89,7 @@ def test_store_force_clears_cache(tmpdir):
         annotated_args=5,
         arg_coverage=100.0,
         return_coverage=100.0,
-        deep_funcs=0,
-        long_funcs=0,
         unannotated_funcs=0,
-        depth_threshold=5,
-        lines_threshold=50,
         funcs_df=pl.DataFrame({"x": [1]}),
     )
     store.save_recap(recap)
