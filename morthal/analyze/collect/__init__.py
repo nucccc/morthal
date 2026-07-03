@@ -1,5 +1,4 @@
 import ast
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generator
@@ -26,7 +25,9 @@ def collect_repo_data(root_path: Path) -> CodeData:
     for pypath in iter_pyfiles(root_path):
         n_files += 1
 
-        for fdata in collect_stats(pypath):
+        # obtaining the local filepath for reporting purposes
+        local_path_str = str(pypath.relative_to(root_path))
+        for fdata in collect_stats(pypath, local_path_str):
             # NOTE: maybe at a point use extend
             dicts_list.append(fdata)
 
@@ -119,7 +120,10 @@ class FuncStats(BaseModel):
 
 # NOTE: at the moment only func stats are returned for a pypath, but one day if
 # class stats or other stuff is collected
-def collect_stats(pypath: Path) -> Generator[dict[str, Any], None, None]:
+def collect_stats(
+    pypath: Path,
+    local_path_str: str,
+) -> Generator[dict[str, Any], None, None]:
     # parsing the module
     ast_mod = ast.parse(pypath.read_text())
     # declaring a nodesink where nodes of interest can be
@@ -131,7 +135,7 @@ def collect_stats(pypath: Path) -> Generator[dict[str, Any], None, None]:
     enrich(ast_mod, node_sink=nsink)
 
     tab_offset = identify_tab_offset(ast_mod)
-    pypath_add = {"fpath":str(pypath)}
+    pypath_add = {"fpath":str(local_path_str)}
 
     for fstats in collect_func_stats(nsink.funcs, tab_offset):
         fdata = fstats.model_dump()
