@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 
 from .main import handle
+from .utils.codebase import LocalCodebase, GitCodebase
+from .utils.store import Store
 from .vcs import normalize_url, clone_repo
 
 
@@ -29,7 +31,7 @@ def main() -> None:
         "--support-dir",
         "-s",
         type=Path,
-        default=None,
+        default='.morthal',
         help="Cache/working directory (default: {target}/.morthal for local, ./.morthal for GitHub)",
     )
     parser.add_argument(
@@ -54,32 +56,25 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.github:
-        url = normalize_url(args.github)
-        print(f"Cloning {url} ...")
-        with tempfile.TemporaryDirectory(prefix="morthal_") as tmp:
-            clone_path = Path(tmp) / "repo"
-            clone_repo(url, clone_path)
-            print(f"Cloned to {clone_path}")
-            if not args.support_dir:
-                args.support_dir = Path(".morthal")
-            handle(
-                target_path=clone_path,
-                support_path=args.support_dir,
-                force=args.force,
-                report=args.report,
-                history=args.history,
-            )
+        # TODO: handle potential errors in case urls is invalid
+        target = GitCodebase(args.github)
     else:
-        target_path = args.path or Path(".")
-        if not args.support_dir:
-            args.support_dir = target_path / ".morthal"
-        handle(
-            target_path=target_path,
-            support_path=args.support_dir,
-            force=args.force,
-            report=args.report,
-            history=args.history,
-        )
+        target = LocalCodebase(args.path)
+
+    store = Store(
+        path=Path(args.support_dir),
+        target=target.name,
+        force=args.force
+    )
+    
+    handle(
+        target=target,
+        store=store,
+        report=args.report,
+        history=args.history,
+    )
+
+    target.dispose()
 
 
 if __name__ == "__main__":

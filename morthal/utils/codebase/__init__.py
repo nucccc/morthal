@@ -18,7 +18,7 @@ class Codebase(Protocol):
     def dispose(self) -> None: ...
 
     @property
-    def repo_path(self) -> Path: ...
+    def path(self) -> Path: ...
 
     @property
     def name(self) -> str: ...
@@ -33,7 +33,7 @@ class LocalCodebase:
         pass 
 
     @property
-    def repo_path(self) -> Path:
+    def path(self) -> Path:
         return self._target_path
     
     @property
@@ -56,7 +56,7 @@ class GitCodebase:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     @property
-    def repo_path(self) -> Path:
+    def path(self) -> Path:
         return self._target_path
     
     @property
