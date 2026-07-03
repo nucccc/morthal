@@ -23,4 +23,15 @@ def test_handle(tmpdir):
 
     assert history_df.shape[0] == 4
 
+    assert history_df['message'][0] == 'second commit'
+    assert history_df['message'][1] == 'third commit'
+    assert history_df['message'][2] == 'fourth commit'
+    assert history_df['message'][3] == 'fifth commit'
+
+    assert history_df['return_coverage'][3] == 100.0
+
+    assert history_df['avg_lines'][1] == 1.0
+    assert history_df['avg_lines'][2] == 1.0
+    assert history_df['avg_lines'][3] == 1.5
+
     codebase.dispose()
