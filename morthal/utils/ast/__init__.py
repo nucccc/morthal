@@ -108,22 +108,16 @@ def enrich(
 
             elden.relative_stmt_depths.append(ast_node.col_offset - elden_col_offset)
 
-    # updating elden in case the node type is of type elden,
-    # this loops through all the types characterizing an elden
-    # node, in case one of these types matches just use it
-    for elden_type in ELDEN_TYPES:
-        if isinstance(ast_node, elden_type):
-            # make ast_node an elden, which basically means
-            # adding some list attributes to let depths be appended
-            # to it
-            ast_node.relative_node_depths = []
-            ast_node.relative_expr_depths = []
-            ast_node.relative_stmt_depths = []
-            # set elden to the ast_node
-            elden = ast_node
-
-            # no need to go on
-            break
+    # updating elden in case the node type is of type elden
+    if any(isinstance(ast_node, elden_type) for elden_type in ELDEN_TYPES):
+        # make ast_node an elden, which basically means
+        # adding some list attributes to let depths be appended
+        # to it
+        ast_node.relative_node_depths = []
+        ast_node.relative_expr_depths = []
+        ast_node.relative_stmt_depths = []
+        # set elden to the ast_node
+        elden = ast_node
 
     # recursive step: for every child of the current node, invoke
     # enrich on it
