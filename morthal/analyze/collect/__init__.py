@@ -7,7 +7,7 @@ from typing import Any, Generator
 import polars as pl
 from pydantic import BaseModel
 
-from morthal.utils.ast import identify_tab_offset, enrich
+from morthal.utils.ast import NodeSink, identify_tab_offset, enrich
 from morthal.utils.calc import max_and_avg
 from morthal.utils.df import empty_df_from_model
 from morthal.utils.path import iter_pyfiles
@@ -120,18 +120,27 @@ class FuncStats(BaseModel):
 # NOTE: at the moment only func stats are returned for a pypath, but one day if
 # class stats or other stuff is collected
 def collect_stats(pypath: Path) -> Generator[dict[str, Any], None, None]:
+    # parsing the module
     ast_mod = ast.parse(pypath.read_text())
-    enrich(ast_mod)
+    # declaring a nodesink where nodes of interest can be
+    # stored during enrichment in order to avoid iterating
+    # again the tree
+    nsink = NodeSink()
+    # enriching the abstract syntax tree of the module,
+    # passing the node sink to avoid rewalking again the tree
+    enrich(ast_mod, node_sink=nsink)
 
     tab_offset = identify_tab_offset(ast_mod)
     pypath_add = {"fpath":str(pypath)}
 
-    for fstats in collect_func_stats(ast_mod, tab_offset):
+    for fstats in collect_func_stats(nsink.funcs, tab_offset):
         fdata = fstats.model_dump()
         fdata.update(pypath_add)
         yield fdata
 
-def collect_func_stats(ast_mod: ast.Module, tab_offset: int) -> Generator[FuncStats, None, None]:
-    for ast_node in ast.walk(ast_mod):
-        if isinstance(ast_node, ast.FunctionDef) or isinstance(ast_node, ast.AsyncFunctionDef):
-            yield FuncStats.from_ast(ast_node, tab_offset)
+def collect_func_stats(
+    func_nodes: list[ast.FunctionDef | ast.AsyncFunctionDef],
+    tab_offset: int
+) -> Generator[FuncStats, None, None]:
+    for func_node in func_nodes:
+        yield FuncStats.from_ast(func_node, tab_offset)
