@@ -7,7 +7,7 @@ from typing import Any, Generator
 import polars as pl
 from pydantic import BaseModel
 
-from morthal.utils.ast import identify_tab_offset, parentify
+from morthal.utils.ast import identify_tab_offset, enrich
 from morthal.utils.calc import max_and_avg
 from morthal.utils.df import empty_df_from_model
 from morthal.utils.path import iter_pyfiles
@@ -121,7 +121,7 @@ class FuncStats(BaseModel):
 # class stats or other stuff is collected
 def collect_stats(pypath: Path) -> Generator[dict[str, Any], None, None]:
     ast_mod = ast.parse(pypath.read_text())
-    parentify(ast_mod)
+    enrich(ast_mod)
 
     tab_offset = identify_tab_offset(ast_mod)
     pypath_add = {"fpath":str(pypath)}

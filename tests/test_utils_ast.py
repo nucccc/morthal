@@ -1,6 +1,6 @@
 import ast
 
-from morthal.utils.ast import identify_tab_offset, parentify
+from morthal.utils.ast import identify_tab_offset, enrich
 
 def verify_parents(ast_node: ast.AST, parent: ast.AST | None = None):
     if parent is not None:
@@ -8,18 +8,18 @@ def verify_parents(ast_node: ast.AST, parent: ast.AST | None = None):
     for child in ast.iter_child_nodes(ast_node):
         verify_parents(ast_node=child, parent=ast_node)
 
-def test_parentify_base():
+def test_enrich_base():
     ast_mod = ast.parse('''a = 0
 def a_func():
     if True:
         return None''')
     
-    parentify(ast_mod)
+    enrich(ast_mod)
 
     verify_parents(ast_node=ast_mod)
 
 
-def test_parentify_elden_focus():
+def test_enrich_elden_focus():
     ast_mod = ast.parse('''
 def a_func():
                         
@@ -41,7 +41,7 @@ class a_class:
     def f_func():
         pass''')
     
-    parentify(ast_mod)
+    enrich(ast_mod)
 
     verify_parents(ast_node=ast_mod)
 
@@ -104,7 +104,7 @@ class a_class:
     assert f_func.depth == 1
 
 
-def test_parentify_depth_focus():
+def test_enrich_depth_focus():
     ast_mod = ast.parse('''
 def do_stuff() -> None:
     try:
@@ -125,7 +125,7 @@ def do_stuff() -> None:
         if not False:
             print('boh')''')
     
-    parentify(ast_node=ast_mod)
+    enrich(ast_node=ast_mod)
 
     fdef: ast.FunctionDef = ast_mod.body[0]
     assert fdef.depth == 0
