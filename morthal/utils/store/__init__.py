@@ -81,3 +81,7 @@ class Store:
     @property
     def _manifest_path(self) -> Path:
         return self.path / ".manifest.json"
+    
+
+    def load_history(self) -> pl.DataFrame:
+        return pl.read_csv(self.path / 'commit_history.csv')
