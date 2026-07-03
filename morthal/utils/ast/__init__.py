@@ -1,4 +1,12 @@
 import ast
+from dataclasses import dataclass, field
+
+
+@dataclass
+class NodeSink:
+    funcs: list[ast.FunctionDef | ast.AsyncFunctionDef] = field(
+        default_factory=lambda:[]
+    )
 
 
 # as a concept an "elden" is supposed to be an abstract syntax
@@ -56,7 +64,8 @@ def enrich(
     ast_node: ast.AST,
     parent: ast.AST | None = None,
     elden: ast.AST | None = None,
-    depth: int = 0
+    depth: int = 0,
+    node_sink: NodeSink | None = None,
 ):
     '''
     enrich shall augment an abstract syntax tree with several
@@ -119,6 +128,9 @@ def enrich(
         # set elden to the ast_node
         elden = ast_node
 
+    if node_sink is not None and (isinstance(ast_node, ast.FunctionDef) or isinstance(ast_node, ast.AsyncFunctionDef)):
+        node_sink.funcs.append(ast_node)
+
     # recursive step: for every child of the current node, invoke
     # enrich on it
     for ast_child in ast.iter_child_nodes(ast_node):
@@ -128,6 +140,7 @@ def enrich(
             parent=ast_node,
             elden=elden,
             depth=depth,
+            node_sink=node_sink,
         )
 
 

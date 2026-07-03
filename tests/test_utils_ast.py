@@ -1,6 +1,6 @@
 import ast
 
-from morthal.utils.ast import identify_tab_offset, enrich
+from morthal.utils.ast import NodeSink, identify_tab_offset, enrich
 
 def verify_parents(ast_node: ast.AST, parent: ast.AST | None = None):
     if parent is not None:
@@ -9,17 +9,26 @@ def verify_parents(ast_node: ast.AST, parent: ast.AST | None = None):
         verify_parents(ast_node=child, parent=ast_node)
 
 def test_enrich_base():
+    nsink = NodeSink()
+
     ast_mod = ast.parse('''a = 0
 def a_func():
     if True:
         return None''')
     
-    enrich(ast_mod)
+    enrich(ast_mod,node_sink=nsink)
 
     verify_parents(ast_node=ast_mod)
 
+    # checking presence of function in the node sink
+    assert len(nsink.funcs) == 1
+    func_a_ast = ast_mod.body[1]
+    assert nsink.funcs[0] is func_a_ast
+
 
 def test_enrich_elden_focus():
+    nsink = NodeSink()
+
     ast_mod = ast.parse('''
 def a_func():
                         
@@ -41,7 +50,7 @@ class a_class:
     def f_func():
         pass''')
     
-    enrich(ast_mod)
+    enrich(ast_mod, node_sink=nsink)
 
     verify_parents(ast_node=ast_mod)
 
@@ -54,7 +63,7 @@ class a_class:
     a_if = a_func.body[1]
     a_return = a_if.body[0]
 
-    a_class = ast_mod.body[0]
+    a_class = ast_mod.body[1]
     d_func = a_class.body[0]
     e_func = d_func.body[0]
     f_func = a_class.body[1]
@@ -102,6 +111,15 @@ class a_class:
     assert f_func.parent is a_class
     assert f_func.elden is a_class
     assert f_func.depth == 1
+
+    # asserting that functions are present in the node sink
+    assert len(nsink.funcs) == 6
+    assert sum(a_func is func_ast for func_ast in nsink.funcs) == 1
+    assert sum(b_func is func_ast for func_ast in nsink.funcs) == 1
+    assert sum(c_func is func_ast for func_ast in nsink.funcs) == 1
+    assert sum(d_func is func_ast for func_ast in nsink.funcs) == 1
+    assert sum(e_func is func_ast for func_ast in nsink.funcs) == 1
+    assert sum(f_func is func_ast for func_ast in nsink.funcs) == 1
 
 
 def test_enrich_depth_focus():
