@@ -18,6 +18,8 @@ class CodeRecap:
     avg_depth: float
     median_depth: float
     avg_lines: float
+    avg_node_depth_per_func: float
+    avg_node_depth: float
     total_args: int
     annotated_args: int
     arg_coverage: float  # percentage
@@ -46,13 +48,17 @@ def build_repo_recap(
     
     # Determine which depth column to use (max_depth or max_stmt_depth)
     depth_col = 'max_stmt_depth'
+
+    total_nodes = df['n_nodes'].sum()
     
     # Basic stats
     total_funcs = len(df)
     avg_depth = float(df[depth_col].mean() or 0.0)  # type: ignore
     median_depth = float(df[depth_col].median() or 0.0)  # type: ignore
     avg_lines = float(df['n_codelines'].mean() or 0.0)  # type: ignore
-    
+    avg_node_depth_per_func = float(df[depth_col].mean() or 0.0)
+    avg_node_depth = float((df['avg_node_depth'] * df['n_nodes']).sum() / total_nodes) if total_nodes != 0 else 0.0
+
     # Annotation coverage
     total_args = int(df['n_func_args'].sum())  # type: ignore
     annotated_args = int(df['n_func_args_annotated'].sum())  # type: ignore
@@ -67,6 +73,8 @@ def build_repo_recap(
         avg_depth=avg_depth,
         median_depth=median_depth,
         avg_lines=avg_lines,
+        avg_node_depth_per_func=avg_node_depth_per_func,
+        avg_node_depth=avg_node_depth,
         total_args=total_args,
         annotated_args=annotated_args,
         arg_coverage=arg_coverage,
