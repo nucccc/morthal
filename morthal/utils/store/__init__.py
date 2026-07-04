@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 
-from morthal.analyze.recap import CodeRecap, RecapFields
+from morthal.analyze.recap import CodeRecap, FuncsRecap
 
 
 _CACHE_FILES = ["funcs.parquet", "recap.json", ".manifest.json"]
@@ -41,13 +41,13 @@ class Store:
     def save_recap(self, recap: CodeRecap) -> None:
         recap.funcs_df.write_parquet(self.path / "funcs.parquet")
         (self.path / "recap.json").write_text(
-            json.dumps(recap.recap.model_dump())
+            json.dumps(recap.funcs_recap.model_dump())
         )
 
     def load_recap(self) -> CodeRecap:
         funcs_df = pl.read_parquet(self.path / "funcs.parquet")
         data = json.loads((self.path / "recap.json").read_text())
-        return CodeRecap(recap=RecapFields(**data), funcs_df=funcs_df)
+        return CodeRecap(funcs_recap=FuncsRecap(**data), funcs_df=funcs_df)
 
     @property
     def _manifest_path(self) -> Path:

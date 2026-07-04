@@ -2,12 +2,12 @@ from pathlib import Path
 
 import polars as pl
 
-from morthal.analyze.recap import CodeRecap, RecapFields
+from morthal.analyze.recap import CodeRecap, FuncsRecap
 from morthal.utils.store import Store
 
 
 recap = CodeRecap(
-    recap=RecapFields(
+    funcs_recap=FuncsRecap(
         total_funcs=10,
         avg_depth=2.5,
         median_depth=2.0,
@@ -35,8 +35,8 @@ def test_store_caches_and_loads_recap(tmpdir):
     assert store.has_cached_recap
 
     loaded = store.load_recap()
-    assert loaded.total_funcs == 10
-    assert loaded.avg_depth == 2.5
+    assert loaded.funcs_recap.total_funcs == 10
+    assert loaded.funcs_recap.avg_depth == 2.5
 
 
 def test_store_mismatched_target_clears_cache(tmpdir):

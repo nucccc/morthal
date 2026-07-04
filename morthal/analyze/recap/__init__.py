@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from morthal.analyze.collect import CodeData
 
 
-class RecapFields(BaseModel):
+class FuncsRecap(BaseModel):
     """Scalar summary statistics — no DataFrame, trivially serializable"""
     total_funcs: int
     avg_depth: float
@@ -29,11 +29,8 @@ class RecapFields(BaseModel):
 
 @dataclass
 class CodeRecap:
-    recap: RecapFields
+    funcs_recap: FuncsRecap
     funcs_df: pl.DataFrame
-
-    def __getattr__(self, name: str):
-        return getattr(self.recap, name)
 
 
 def build_repo_recap(
@@ -75,7 +72,7 @@ def build_repo_recap(
     unannotated_funcs = len(df.filter(~pl.col('return_annotated')))
     
     return CodeRecap(
-        recap=RecapFields(
+        funcs_recap=FuncsRecap(
             total_funcs=total_funcs,
             avg_depth=avg_depth,
             median_depth=median_depth,
@@ -105,23 +102,14 @@ class RepoHistory:
     history: list[tuple[Commit, CodeRecap]]
 
     def to_csv(self, path: Path) -> None:
-        import polars as pl
-        rows = [
-            {
+        rows: list[dict] = []
+        for c, r in self.history:
+            row = {
                 'commit_hash': c.hash,
                 'datetime': c.dt.isoformat(),
                 'author': c.author,
                 'message': c.message,
-                'total_funcs': r.total_funcs,
-                'avg_depth': r.avg_depth,
-                'median_depth': r.median_depth,
-                'avg_lines': r.avg_lines,
-                'total_args': r.total_args,
-                'annotated_args': r.annotated_args,
-                'arg_coverage': r.arg_coverage,
-                'return_coverage': r.return_coverage,
-                'unannotated_funcs': r.unannotated_funcs,
             }
-            for c, r in self.history
-        ]
+            row.update(r.funcs_recap.model_dump())
+            rows.append(row)
         pl.DataFrame(rows).write_csv(path)
