@@ -1,4 +1,4 @@
-from morthal.vcs.url_utils import is_git_url, normalize_url
+from morthal.utils.url import is_git_url, normalize_url
 
 
 def test_is_git_url_protocol_prefixes():

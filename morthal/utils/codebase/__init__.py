@@ -3,7 +3,8 @@ import tempfile
 from pathlib import Path
 from typing import Protocol
 
-from morthal.vcs import clone_repo, normalize_url
+from morthal.history import clone_repo
+from morthal.utils.url import normalize_url
 
 
 # TODO: elegant method to verify if a git repositoy is found
