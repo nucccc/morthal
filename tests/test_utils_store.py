@@ -2,22 +2,24 @@ from pathlib import Path
 
 import polars as pl
 
-from morthal.analyze.recap import CodeRecap
+from morthal.analyze.recap import CodeRecap, RecapFields
 from morthal.utils.store import Store
 
 
 recap = CodeRecap(
-    total_funcs=10,
-    avg_depth=2.5,
-    median_depth=2.0,
-    avg_lines=15.0,
-    avg_node_depth_per_func=2.0,
-    avg_node_depth=2.0,
-    total_args=20,
-    annotated_args=15,
-    arg_coverage=75.0,
-    return_coverage=80.0,
-    unannotated_funcs=3,
+    recap=RecapFields(
+        total_funcs=10,
+        avg_depth=2.5,
+        median_depth=2.0,
+        avg_lines=15.0,
+        avg_node_depth_per_func=2.0,
+        avg_node_depth=2.0,
+        total_args=20,
+        annotated_args=15,
+        arg_coverage=75.0,
+        return_coverage=80.0,
+        unannotated_funcs=3,
+    ),
     funcs_df=pl.DataFrame({"x": [1, 2, 3]}),
 )
 

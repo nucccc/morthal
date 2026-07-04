@@ -7,13 +7,13 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
+from pydantic import BaseModel
 
 from morthal.analyze.collect import CodeData
 
 
-@dataclass
-class CodeRecap:
-    """Summary statistics for repository analysis"""
+class RecapFields(BaseModel):
+    """Scalar summary statistics — no DataFrame, trivially serializable"""
     total_funcs: int
     avg_depth: float
     median_depth: float
@@ -22,12 +22,18 @@ class CodeRecap:
     avg_node_depth: float
     total_args: int
     annotated_args: int
-    arg_coverage: float  # percentage
-    return_coverage: float  # percentage
-    unannotated_funcs: int  # functions without return type
+    arg_coverage: float
+    return_coverage: float
+    unannotated_funcs: int
 
+
+@dataclass
+class CodeRecap:
+    recap: RecapFields
     funcs_df: pl.DataFrame
 
+    def __getattr__(self, name: str):
+        return getattr(self.recap, name)
 
 
 def build_repo_recap(
@@ -69,18 +75,20 @@ def build_repo_recap(
     unannotated_funcs = len(df.filter(~pl.col('return_annotated')))
     
     return CodeRecap(
-        total_funcs=total_funcs,
-        avg_depth=avg_depth,
-        median_depth=median_depth,
-        avg_lines=avg_lines,
-        avg_node_depth_per_func=avg_node_depth_per_func,
-        avg_node_depth=avg_node_depth,
-        total_args=total_args,
-        annotated_args=annotated_args,
-        arg_coverage=arg_coverage,
-        return_coverage=return_coverage,
-        unannotated_funcs=unannotated_funcs,
-        funcs_df=df
+        recap=RecapFields(
+            total_funcs=total_funcs,
+            avg_depth=avg_depth,
+            median_depth=median_depth,
+            avg_lines=avg_lines,
+            avg_node_depth_per_func=avg_node_depth_per_func,
+            avg_node_depth=avg_node_depth,
+            total_args=total_args,
+            annotated_args=annotated_args,
+            arg_coverage=arg_coverage,
+            return_coverage=return_coverage,
+            unannotated_funcs=unannotated_funcs,
+        ),
+        funcs_df=df,
     )
 
 

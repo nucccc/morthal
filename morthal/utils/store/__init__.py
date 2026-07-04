@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 
-from morthal.analyze.recap import CodeRecap
+from morthal.analyze.recap import CodeRecap, RecapFields
 
 
 _CACHE_FILES = ["funcs.parquet", "recap.json", ".manifest.json"]
@@ -40,39 +40,14 @@ class Store:
 
     def save_recap(self, recap: CodeRecap) -> None:
         recap.funcs_df.write_parquet(self.path / "funcs.parquet")
-        with open(self.path / "recap.json", "w") as f:
-            json.dump({
-                "total_funcs": recap.total_funcs,
-                "avg_depth": recap.avg_depth,
-                "median_depth": recap.median_depth,
-                "avg_lines": recap.avg_lines,
-                "avg_node_depth_per_func": recap.avg_node_depth_per_func,
-                "avg_node_depth": recap.avg_node_depth,
-                "total_args": recap.total_args,
-                "annotated_args": recap.annotated_args,
-                "arg_coverage": recap.arg_coverage,
-                "return_coverage": recap.return_coverage,
-                "unannotated_funcs": recap.unannotated_funcs,
-            }, f)
+        (self.path / "recap.json").write_text(
+            json.dumps(recap.recap.model_dump())
+        )
 
     def load_recap(self) -> CodeRecap:
         funcs_df = pl.read_parquet(self.path / "funcs.parquet")
-        with open(self.path / "recap.json") as f:
-            data = json.load(f)
-        return CodeRecap(
-            total_funcs=data["total_funcs"],
-            avg_depth=data["avg_depth"],
-            median_depth=data["median_depth"],
-            avg_lines=data["avg_lines"],
-            avg_node_depth_per_func=data["avg_node_depth_per_func"],
-            avg_node_depth=data["avg_node_depth"],
-            total_args=data["total_args"],
-            annotated_args=data["annotated_args"],
-            arg_coverage=data["arg_coverage"],
-            return_coverage=data["return_coverage"],
-            unannotated_funcs=data["unannotated_funcs"],
-            funcs_df=funcs_df,
-        )
+        data = json.loads((self.path / "recap.json").read_text())
+        return CodeRecap(recap=RecapFields(**data), funcs_df=funcs_df)
 
     @property
     def _manifest_path(self) -> Path:
