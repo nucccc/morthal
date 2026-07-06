@@ -1,6 +1,7 @@
 import ast
 
 from morthal.utils.ast import (
+    ELDEN_TYPES,
     ModCounts,
     NodeSink,
     identify_tab_offset,
@@ -280,3 +281,14 @@ def do_stuff() -> None:
     assert mc.n_nodes == 58
     assert mc.n_stmts == 14
     assert mc.total_stmt_depth == 184
+
+
+def test_elden_types():
+    '''
+    some boring test to ensure the nature of elden types
+    '''
+    assert len(ELDEN_TYPES) == 4
+    assert ast.Module in ELDEN_TYPES
+    assert ast.ClassDef in ELDEN_TYPES
+    assert ast.FunctionDef in ELDEN_TYPES
+    assert ast.AsyncFunctionDef in ELDEN_TYPES
