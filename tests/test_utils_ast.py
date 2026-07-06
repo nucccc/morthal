@@ -1,6 +1,11 @@
 import ast
 
-from morthal.utils.ast import NodeSink, identify_tab_offset, enrich
+from morthal.utils.ast import (
+    ModCounts,
+    NodeSink,
+    identify_tab_offset,
+    enrich,
+)
 
 def verify_parents(ast_node: ast.AST, parent: ast.AST | None = None):
     if parent is not None:
@@ -245,3 +250,33 @@ elif False:
 
 def a():
     pass''')) == 4
+
+
+def test_mod_count():
+    ast_mod = ast.parse('''
+def do_stuff() -> None:
+    try:
+        print('hello')
+    except ValueError:
+        if True:
+            if not False:
+                for i in range(10):
+                    try:
+                        print(i)
+                    except TypeError:
+                        if True:
+                            pass
+    else:
+        if 1 > 0:
+            print(' world')
+    finally:
+        if not False:
+            print('boh')''')
+    
+    mc = ModCounts()
+    
+    enrich(ast_node=ast_mod, cpf=mc)
+
+    assert mc.n_nodes == 58
+    assert mc.n_stmts == 14
+    assert mc.total_stmt_depth == 184

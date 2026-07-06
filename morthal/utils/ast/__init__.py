@@ -8,6 +8,17 @@ class NodeSink:
         default_factory=lambda:[]
     )
 
+@dataclass
+class ModCounts:
+    '''
+    this shall somehow be a class where we store file level info
+    '''
+    n_nodes: int = 0
+    total_node_depth: int = 0
+    total_elden_node_depth: int = 0
+    n_stmts: int = 0
+    total_stmt_depth: int = 0
+
 
 # as a concept an "elden" is supposed to be an abstract syntax
 # tree node at which the depth calculations "reset". the idea is
@@ -66,6 +77,7 @@ def enrich(
     elden: ast.AST | None = None,
     depth: int = 0,
     node_sink: NodeSink | None = None,
+    cpf: ModCounts | None = None,
 ):
     '''
     enrich shall augment an abstract syntax tree with several
@@ -131,6 +143,22 @@ def enrich(
     if node_sink is not None and (isinstance(ast_node, ast.FunctionDef) or isinstance(ast_node, ast.AsyncFunctionDef)):
         node_sink.funcs.append(ast_node)
 
+    if cpf is not None:
+        cpf.n_nodes += 1
+        cpf.total_node_depth += depth
+        if elden:
+            relative_depth = depth - elden.depth
+            cpf.total_elden_node_depth += relative_depth
+        else:
+            cpf.total_elden_node_depth += depth
+
+        # marking the statement
+        if isinstance(ast_node, ast.stmt):
+            cpf.n_stmts += 1
+            # I gotta augment only in one case
+            cpf.total_stmt_depth += ast_node.col_offset#  - elden_col_offset
+
+
     # recursive step: for every child of the current node, invoke
     # enrich on it
     for ast_child in ast.iter_child_nodes(ast_node):
@@ -141,6 +169,7 @@ def enrich(
             elden=elden,
             depth=depth,
             node_sink=node_sink,
+            cpf=cpf,
         )
 
 
