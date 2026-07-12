@@ -1,4 +1,4 @@
-from morthal.analyze.collect import collect_repo_data
+from morthal.analyze.collect import collect_codebase_data
 from morthal.analyze.recap import build_repo_recap
 from morthal.history import walk_commit_history
 from morthal.reporter import HTMLReporter
@@ -16,7 +16,7 @@ def handle(
     if store.has_cached_recap:
         recap = store.load_recap()
     else:
-        repo_data = collect_repo_data(target.path)
+        repo_data = collect_codebase_data(target.path)
         recap = build_repo_recap(repo_data)
         store.save_recap(recap)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from git import Repo
 
-from morthal.analyze.collect import collect_repo_data
+from morthal.analyze.collect import collect_codebase_data
 from morthal.analyze.recap import Commit, RepoHistory, build_repo_recap
 
 
@@ -23,7 +23,7 @@ def walk_commit_history(repo_path: Path) -> RepoHistory:
 
         with tempfile.TemporaryDirectory(prefix="morthal_extract_") as xtmp:
             extract_py_files(repo, git_commit.hexsha, Path(xtmp))
-            cd = collect_repo_data(Path(xtmp))
+            cd = collect_codebase_data(Path(xtmp))
             cr = build_repo_recap(cd)
             history.history.append((commit, cr))
 

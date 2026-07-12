@@ -6,16 +6,75 @@ from typing import Any, Generator
 import polars as pl
 from pydantic import BaseModel
 
-from morthal.utils.ast import NodeSink, identify_tab_offset, enrich
+from .data import (
+    CodebaseData,
+    CodebaseDataBuilder,
+    FuncStats,
+)
+from morthal.utils.ast import (
+    ModCounts,
+    NodeSink,
+    identify_tab_offset,
+    enrich
+)
 from morthal.utils.calc import max_and_avg
-from morthal.utils.df import empty_df_from_model
 from morthal.utils.path import iter_pyfiles
 
 
 @dataclass
 class CodeData:
     n_files: int
+    files_df: pl.DataFrame
     funcs_df: pl.DataFrame
+
+
+def collect_codebase_data(codebase_path: Path) -> CodebaseData:
+    cbuilder = CodebaseDataBuilder()
+
+    for pypath in iter_pyfiles(codebase_path):
+        local_path_str = str(pypath.relative_to(codebase_path))
+        collect_pyfile(pypath, cbuilder, local_path_str)
+    
+    return cbuilder.build()
+
+
+def collect_pyfile(
+    filepath: Path,
+    cbuilder: CodebaseDataBuilder,
+    local_path_str: str,
+):
+    ast_mod = ast.parse(filepath.read_text())
+    mcounts = ModCounts()
+    # declaring a nodesink where nodes of interest can be
+    # stored during enrichment in order to avoid iterating
+    # again the tree
+    nsink = NodeSink()
+    # enriching the abstract syntax tree of the module,
+    # passing the node sink to avoid rewalking again the tree
+    enrich(ast_mod, node_sink=nsink, cpf=mcounts)
+
+    tab_offset = identify_tab_offset(ast_mod)
+    pypath_add = {"fpath":str(local_path_str)}
+
+    for func_ast in nsink.funcs:
+        fstats = collect_func_stats(func_ast, tab_offset)
+        fdata = fstats.model_dump()
+        fdata.update(pypath_add)
+        cbuilder.add_func(fdata)
+
+    #for fstats in collect_func_stats(, tab_offset):
+    #    fdata = fstats.model_dump()
+    #    fdata.update(pypath_add)
+    #    cbuilder.add_func(fdata)
+    
+
+    # collecting filedata in the end
+    cbuilder.add_file({
+        'fpath':str(local_path_str),
+        'n_nodes':mcounts.n_nodes,
+        'n_startements':mcounts.n_stmts,
+    })
+
 
 
 def collect_repo_data(root_path: Path) -> CodeData:
@@ -36,10 +95,6 @@ def collect_repo_data(root_path: Path) -> CodeData:
         funcs_df=funcs_dict_to_df(dicts_list)
     )
 
-def funcs_dict_to_df(dicts_list: list[dict[str, Any]]) -> pl.DataFrame:
-    if len(dicts_list) == 0:
-        return empty_df_from_model(FuncStats)
-    return pl.DataFrame(dicts_list)
 
 # NOTE: a little bit of over engineering...  
 @dataclass
@@ -63,59 +118,6 @@ def count_exprs(func_ast: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
         if isinstance(elem, ast.expr):
             count += 1
     return count
-
-
-class FuncStats(BaseModel):
-    name: str
-    parent_name: str | None
-    name_len: int
-    max_node_depth: int
-    max_stmt_depth: int
-    avg_node_depth: float
-    avg_stmt_depth: float
-    n_codelines: int
-    n_exprs: int
-    n_nodes: int
-    n_func_args : int
-    n_func_args_annotated : int
-    return_annotated : bool
-    docstring: str | None = None
-
-    @classmethod
-    def from_ast(cls, func_ast : ast.FunctionDef, tab_offset: int) -> 'FuncStats':
-        '''
-        this shall assume the ast was "parentified"
-        '''
-        n_codelines = func_ast.end_lineno - func_ast.lineno
-        func_arg_stats = get_func_args_stats(func_ast)
-
-        max_node_depth, avg_node_depth = max_and_avg(func_ast.relative_node_depths)
-        max_stmt_depth, avg_stmt_depth = max_and_avg(func_ast.relative_stmt_depths)
-
-        if tab_offset > 0:
-            max_stmt_depth = int(max_stmt_depth / tab_offset)
-            avg_stmt_depth = avg_stmt_depth / tab_offset
-
-        parent_name = None
-        if hasattr(func_ast, 'elden') and hasattr(func_ast.elden, 'name'):
-            parent_name = func_ast.elden.name
-
-        return FuncStats(
-            name=func_ast.name,
-            parent_name=parent_name,
-            name_len=len(func_ast.name),
-            max_node_depth=max_node_depth,
-            max_stmt_depth=max_stmt_depth,
-            avg_node_depth=avg_node_depth,
-            avg_stmt_depth=avg_stmt_depth,
-            n_codelines = n_codelines,
-            n_exprs=len(func_ast.relative_stmt_depths),
-            n_nodes=len(func_ast.relative_node_depths),
-            n_func_args = func_arg_stats.n_func_args,
-            n_func_args_annotated = func_arg_stats.n_func_args_annotated,
-            return_annotated = func_ast.returns is not None,
-            docstring = ast.get_docstring(func_ast)
-        )
     
 
 # NOTE: at the moment only func stats are returned for a pypath, but one day if
@@ -126,13 +128,14 @@ def collect_stats(
 ) -> Generator[dict[str, Any], None, None]:
     # parsing the module
     ast_mod = ast.parse(pypath.read_text())
+    mcounts = ModCounts()
     # declaring a nodesink where nodes of interest can be
     # stored during enrichment in order to avoid iterating
     # again the tree
     nsink = NodeSink()
     # enriching the abstract syntax tree of the module,
     # passing the node sink to avoid rewalking again the tree
-    enrich(ast_mod, node_sink=nsink)
+    enrich(ast_mod, node_sink=nsink, cpf=mcounts)
 
     tab_offset = identify_tab_offset(ast_mod)
     pypath_add = {"fpath":str(local_path_str)}
@@ -148,3 +151,35 @@ def collect_func_stats(
 ) -> Generator[FuncStats, None, None]:
     for func_node in func_nodes:
         yield FuncStats.from_ast(func_node, tab_offset)
+
+def collect_func_stats(func_ast : ast.FunctionDef, tab_offset: int):
+    n_codelines = func_ast.end_lineno - func_ast.lineno
+    func_arg_stats = get_func_args_stats(func_ast)
+
+    max_node_depth, avg_node_depth = max_and_avg(func_ast.relative_node_depths)
+    max_stmt_depth, avg_stmt_depth = max_and_avg(func_ast.relative_stmt_depths)
+
+    if tab_offset > 0:
+        max_stmt_depth = int(max_stmt_depth / tab_offset)
+        avg_stmt_depth = avg_stmt_depth / tab_offset
+
+    parent_name = None
+    if hasattr(func_ast, 'elden') and hasattr(func_ast.elden, 'name'):
+        parent_name = func_ast.elden.name
+
+    return FuncStats(
+        name=func_ast.name,
+        parent_name=parent_name,
+        name_len=len(func_ast.name),
+        max_node_depth=max_node_depth,
+        max_stmt_depth=max_stmt_depth,
+        avg_node_depth=avg_node_depth,
+        avg_stmt_depth=avg_stmt_depth,
+        n_codelines = n_codelines,
+        n_exprs=len(func_ast.relative_stmt_depths),
+        n_nodes=len(func_ast.relative_node_depths),
+        n_func_args = func_arg_stats.n_func_args,
+        n_func_args_annotated = func_arg_stats.n_func_args_annotated,
+        return_annotated = func_ast.returns is not None,
+        docstring = ast.get_docstring(func_ast)
+    )
