@@ -9,7 +9,7 @@ from pathlib import Path
 import polars as pl
 from pydantic import BaseModel
 
-from morthal.analyze.collect import CodeData
+from morthal.analyze.collect import CodebaseData
 
 
 class FuncsRecap(BaseModel):
@@ -34,7 +34,7 @@ class CodeRecap:
 
 
 def build_repo_recap(
-    repo_data: CodeData,
+    repo_data: CodebaseData,
 ) -> CodeRecap:
     """
     Build a repository recap with summary statistics from repo data.

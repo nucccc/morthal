@@ -49,14 +49,14 @@ class HTMLReporter:
             HTMLReporter instance
         """
 
-        from morthal.analyze.collect import CodeData
+        from morthal.analyze.collect import CodebaseData
         from morthal.analyze.recap import build_repo_recap
         
         df = pl.read_csv(csv_path)
         
         if recap is None:
             # Build recap from the DataFrame
-            repo_data = CodeData(n_files=0, funcs_df=df)
+            repo_data = CodebaseData(n_files=0, funcs_df=df)
             recap = build_repo_recap(repo_data, depth_high=cls.DEPTH_HIGH, lines_long=cls.LINES_LONG)
         
         return cls(df, recap)
